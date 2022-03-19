@@ -866,7 +866,7 @@ int main()
     AssertThrow(compute_semaphore_chain.Create(engine.GetInstance()->GetDevice()));
 
     auto compute_cmd_result = compute_command_buffer->Create(engine.GetInstance()->GetDevice(), engine.GetInstance()->GetComputeCommandPool());
-    AssertThrow(compute_cmd_result, "Failed to create compute commandbuffer: %s\n", compute_cmd_result.message);
+    AssertThrowMsg(compute_cmd_result, "Failed to create compute commandbuffer: %s\n", compute_cmd_result.message);
     
     for (size_t i = 0; i < engine.GetInstance()->GetFrameHandler()->GetNumFrames(); i++) {
         compute_semaphore_chain >> engine.GetInstance()->GetFrameHandler()
