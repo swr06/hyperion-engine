@@ -96,11 +96,7 @@ std::shared_ptr<Loadable> AssetManager::LoadFromFile(const std::string &path, bo
             if (loader != nullptr) {
                 auto loaded = loader->LoadFromFile(path);
 
-                if (!loaded) {
-                    throw std::string("Loader returned no data");
-                } else {
-                    //std::lock_guard guard(load_asset_mtx);
-
+                if (loaded) {
                     loaded->SetFilePath(path);
 
                     loaded_assets[path] = loaded;
@@ -129,6 +125,6 @@ const std::unique_ptr<AssetLoader> &AssetManager::GetLoader(const std::string &p
         }
     }
 
-    throw (std::string("No suitable loader found for requested file: ") + path);
+    throw std::runtime_error("No suitable loader found for requested file");
 }
 } // namespace hyperion
