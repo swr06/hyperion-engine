@@ -8,24 +8,24 @@
 namespace hyperion {
 struct RiffHeader {
     char chunk_id[4];
-    long chunk_size;
+    uint32_t chunk_size;
     char format[4];
 };
 
 struct WaveFormat {
     char sub_chunk_id[4];
-    long sub_chunk_size;
-    short audio_format;
-    short num_channels;
-    long sample_rate;
-    long byte_rate;
-    short block_align;
-    short bits_per_sample;
+    uint32_t sub_chunk_size;
+    uint16_t audio_format;
+    uint16_t num_channels;
+    uint32_t sample_rate;
+    uint32_t byte_rate;
+    uint16_t block_align;
+    uint16_t bits_per_sample;
 };
 
 struct WaveData {
     char sub_chunk_id[4];
-    long sub_chunk_2_size;
+    uint32_t sub_chunk_2_size;
 };
 
 std::shared_ptr<Loadable> WavLoader::LoadFromFile(const std::string &path)
@@ -44,6 +44,7 @@ std::shared_ptr<Loadable> WavLoader::LoadFromFile(const std::string &path)
     try {
         fs.open(path, std::ios::binary);
         if (!fs.is_open()) {
+            std::cout << "could not open file\n";
             return nullptr;
         }
 
@@ -56,7 +57,8 @@ std::shared_ptr<Loadable> WavLoader::LoadFromFile(const std::string &path)
                 riff_header.format[1] != 'A' ||
                 riff_header.format[2] != 'V' ||
                 riff_header.format[3] != 'E')) {
-            throw ("Invalid RIFF or WAVE Header");
+            std::cout << "Invalid RIFF or WAVE Header\n";
+            throw std::runtime_error("Invalid RIFF or WAVE Header");
         }
 
         fs.read((char*)&wave_format, sizeof(WaveFormat));
@@ -64,11 +66,12 @@ std::shared_ptr<Loadable> WavLoader::LoadFromFile(const std::string &path)
             wave_format.sub_chunk_id[1] != 'm' ||
             wave_format.sub_chunk_id[2] != 't' ||
             wave_format.sub_chunk_id[3] != ' ') {
-            throw ("Invalid Wave Format");
+            std::cout << "Invalid Wave format\n";
+            throw std::runtime_error("Invalid Wave Format");
         }
 
         if (wave_format.sub_chunk_size > 16) {
-            fs.seekg(sizeof(short));
+            fs.seekg(sizeof(uint16_t));
         }
 
 
@@ -77,7 +80,8 @@ std::shared_ptr<Loadable> WavLoader::LoadFromFile(const std::string &path)
             wave_data.sub_chunk_id[1] != 'a' ||
             wave_data.sub_chunk_id[2] != 't' ||
             wave_data.sub_chunk_id[3] != 'a') {
-            throw ("Invalid data header");
+            std::cout << "Invalid data header\n";
+            throw std::runtime_error("Invalid data header");
         }
 
         // Read data
@@ -107,10 +111,11 @@ std::shared_ptr<Loadable> WavLoader::LoadFromFile(const std::string &path)
         fs.close();
 
         return audio_source;
-    } catch (std::string error) {
+    } catch (...) {
         if (fs.is_open()) {
             fs.close();
         }
+
         return nullptr;
     }
 }
