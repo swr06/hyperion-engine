@@ -4,6 +4,8 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 
+#include "audio_control.h"
+#include "audio_source.h"
 #include "../math/vector3.h"
 
 namespace hyperion {

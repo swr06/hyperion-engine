@@ -311,6 +311,16 @@ public:
             auto model = asset_manager->LoadFromFile<Node>("models/sponza/sponza.obj");
             model->SetName("model");
             model->Scale(Vector3(0.01f));
+
+            // Add an AudioControl, provide it with an AudioSource (which is an instance of Loadable)
+            auto audio_ctrl = std::make_shared<AudioControl>(
+                AssetManager::GetInstance()->LoadFromFile<AudioSource>("sounds/cartoon001.wav"));
+
+            // Add that AudioControl to your node so it is associated with a 3d space
+            model->AddControl(audio_ctrl);
+            audio_ctrl->GetSource()->SetLoop(true);
+            audio_ctrl->GetSource()->Play();
+
             for (size_t i = 0; i < model->NumChildren(); i++) {
                 if (model->GetChild(i) == nullptr) {
                     continue;
@@ -537,12 +547,8 @@ public:
                 for (int z = 0; z < 5; z++) {
 
                     Vector3 box_position = Vector3(((float(x))), 6.4f, (float(z)));
-
-                    //m_threads.emplace_back(std::thread([=, scene = GetScene()]() {
                     auto box = asset_manager->LoadFromFile<Node>("models/cube.obj", true);
                     box->SetLocalScale(0.35f);
-
-                    //box->Rotate(Quaternion(Vector3::UnitX(), MathUtil::DegToRad(90.0f)));
 
                     for (size_t i = 0; i < box->NumChildren(); i++) {
                         box->GetChild(0)->GetMaterial().SetTexture(MATERIAL_TEXTURE_DIFFUSE_MAP, asset_manager->LoadFromFile<Texture2D>("textures/rough-wet-cobble-ue/rough-wet-cobble-albedo.png"));
@@ -550,20 +556,11 @@ public:
                         box->GetChild(0)->GetMaterial().SetTexture(MATERIAL_TEXTURE_NORMAL_MAP, asset_manager->LoadFromFile<Texture2D>("textures/rough-wet-cobble-ue/rough-wet-cobble-normal-dx.png"));
                         box->GetChild(0)->GetMaterial().SetTexture(MATERIAL_TEXTURE_ROUGHNESS_MAP, asset_manager->LoadFromFile<Texture2D>("textures/rough-wet-cobble-ue/rough-wet-cobble-roughness.png"));
                         box->GetChild(0)->GetMaterial().SetTexture(MATERIAL_TEXTURE_METALNESS_MAP, asset_manager->LoadFromFile<Texture2D>("textures/rough-wet-cobble-ue/rough-wet-cobble-metallic.png"));
-                        //box->GetChild(0)->GetMaterial().SetTexture(MATERIAL_TEXTURE_PARALLAX_MAP, asset_manager->LoadFromFile<Texture2D>("textures/rough-wet-cobble-ue/rough-wet-cobble-height.png"));
                         box->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_FLIP_UV, Vector2(0, 1));
-                        //box->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_PARALLAX_HEIGHT, 0.25f);
-
-                         //box->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_PARALLAX_HEIGHT, 5.0f);
-                         //box->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.1f);
-                         //box->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                         //box->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, x / 5.0f);
-                         //box->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.2f);
+                        
                     }
-                    //Environment::GetInstance()->AddPointLight(std::make_shared<PointLight>(box_position + Vector3(0, 1, 0), Vector4(col.x, col.y, col.z, 1.0f) * 1.0f, 2.0f));
                     box->SetLocalTranslation(box_position);
                     GetScene()->AddChildAsync(box, [](auto) {});
-                    // }));
                 }
             }
         }
@@ -689,79 +686,6 @@ public:
 
 int main()
 {
-    // timing test
-    /*{ // fbom
-        using namespace std;
-        using namespace std::chrono;
-        auto start = high_resolution_clock::now();
-    
-        // Call the function, here sort()
-        std::shared_ptr<Loadable> result;
-        for (int i = 0; i < 100; i++) {
-            result = fbom::FBOMLoader().LoadFromFile("./test.fbom");
-        }
-    
-        // Get ending timepoint
-        auto stop = high_resolution_clock::now();
-    
-        // Get duration. Substart timepoints to 
-        // get durarion. To cast it to proper unit
-        // use duration cast method
-        auto duration = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1>>>(stop - start).count();
-
-        std::cout << "FBOM time: " << duration << "\n";
-    }
-    // timing test
-    { // obj
-        using namespace std;
-        using namespace std::chrono;
-        auto start = high_resolution_clock::now();
-    
-        // Call the function, here sort()
-        std::shared_ptr<Loadable> result;
-        for (int i = 0; i < 100; i++) {
-            result = asset_manager->LoadFromFile<Entity>("models/sphere_hq.obj", false);
-        }
-    
-        // Get ending timepoint
-        auto stop = high_resolution_clock::now();
-    
-        // Get duration. Substart timepoints to 
-        // get durarion. To cast it to proper unit
-        // use duration cast method
-        auto duration = std::chrono::duration_cast<std::chrono::duration<double, std::ratio<1>>>(stop - start).count();
-
-        std::cout << "OBJ time: " << duration << "\n";
-    }*/
-
-
-    // std::shared_ptr<Entity> my_entity = std::make_shared<Entity>("FOO BAR");
-    // my_entity->AddControl(std::make_shared<NoiseTerrainControl>(nullptr, 12345));
-
-    // auto my_entity = asset_manager->LoadFromFile<Entity>("models/sphere_hq.obj", true);
-    // my_entity->Scale(Vector3(0.2f));
-    // my_entity->Move(Vector3(0, 2, 0));
-
-    // FileByteWriter fbw("test.fbom");
-    // fbom::FBOMWriter writer;
-    // writer.Append(my_entity.get());
-    // auto res = writer.Emit(&fbw);
-    // fbw.Close();
-
-    // if (res != fbom::FBOMResult::FBOM_OK) {
-    //     throw std::runtime_error(std::string("FBOM Error: ") + res.message);
-    // }
-
-    // return 0;
-
-    /*std::shared_ptr<Loadable> result = fbom::FBOMLoader().LoadFromFile("./test.fbom");
-
-    if (auto entity = std::dynamic_pointer_cast<Entity>(result)) {
-        std::cout << "Loaded entity name: " << entity->GetName() << "\n";
-    }
-
-    return 0;*/
-
     CoreEngine *engine = new GlfwEngine();
     CoreEngine::SetInstance(engine);
 
