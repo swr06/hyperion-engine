@@ -9,9 +9,8 @@ namespace hyperion::v2 {
 
 using renderer::MeshInputAttribute;
 
-GraphicsPipeline::GraphicsPipeline(Shader::ID shader_id, RenderPass::ID render_pass_id, Bucket bucket)
+GraphicsPipeline::GraphicsPipeline(Shader::ID shader_id, Bucket bucket)
     : m_shader_id(shader_id),
-      m_render_pass_id(render_pass_id),
       m_bucket(bucket),
       m_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST),
       m_cull_mode(renderer::GraphicsPipeline::CullMode::BACK),
@@ -76,14 +75,10 @@ void GraphicsPipeline::OnSpatialRemoved(Spatial *spatial)
     }
 }
 
-void GraphicsPipeline::Create(Engine *engine)
+void GraphicsPipeline::Create(Engine *engine, RenderPass *render_pass)
 {
     auto *shader = engine->GetShader(m_shader_id);
     AssertThrow(shader != nullptr);
-
-    // TODO: Assert that render_pass matches the layout of what the fbo was set up with
-    auto *render_pass = engine->GetRenderPass(m_render_pass_id);
-    AssertThrow(render_pass != nullptr);
 
     renderer::GraphicsPipeline::ConstructionInfo construction_info{
         .vertex_attributes = m_vertex_attributes,
@@ -93,8 +88,7 @@ void GraphicsPipeline::Create(Engine *engine)
         .depth_test        = m_depth_test,
         .depth_write       = m_depth_write,
         .blend_enabled     = m_blend_enabled,
-        .shader            = &shader->Get(),
-        .render_pass       = &render_pass->Get()
+        .shader            = &shader->Get()
     };
 
     for (const auto &fbo_id : m_fbo_ids.ids) {
@@ -118,7 +112,7 @@ void GraphicsPipeline::Create(Engine *engine)
         per_frame_data[i].Set<CommandBuffer>(std::move(command_buffer));
     }
 
-    EngineComponent::Create(engine, std::move(construction_info), &engine->GetInstance()->GetDescriptorPool());
+    EngineComponent::Create(engine, std::move(construction_info), &render_pass->Get(),  &engine->GetInstance()->GetDescriptorPool());
 }
 
 void GraphicsPipeline::Destroy(Engine *engine)
@@ -146,7 +140,7 @@ void GraphicsPipeline::Destroy(Engine *engine)
     EngineComponent::Destroy(engine);
 }
 
-void GraphicsPipeline::Render(Engine *engine, CommandBuffer *primary_command_buffer, uint32_t frame_index)
+void GraphicsPipeline::Render(Engine *engine, CommandBuffer *primary, RenderPass *render_pass, uint32_t frame_index)
 {
     auto *instance = engine->GetInstance();
     auto *secondary_command_buffer = m_per_frame_data->At(frame_index).Get<CommandBuffer>();
@@ -156,7 +150,7 @@ void GraphicsPipeline::Render(Engine *engine, CommandBuffer *primary_command_buf
 
     secondary_command_buffer->Record(
         instance->GetDevice(),
-        m_wrapped.GetConstructionInfo().render_pass,
+        &render_pass->Get(),
         [this, instance, frame_index](CommandBuffer *secondary) {
             m_wrapped.Bind(secondary);
 
@@ -202,7 +196,7 @@ void GraphicsPipeline::Render(Engine *engine, CommandBuffer *primary_command_buf
             HYPERION_RETURN_OK;
         });
     
-    secondary_command_buffer->SubmitSecondary(primary_command_buffer);
+    secondary_command_buffer->SubmitSecondary(primary);
 }
 
 } // namespace hyperion::v2

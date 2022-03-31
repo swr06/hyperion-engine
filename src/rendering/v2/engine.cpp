@@ -21,7 +21,8 @@ using renderer::FramebufferObject;
 
 Engine::Engine(SystemSDL &_system, const char *app_name)
     : m_instance(new Instance(_system, app_name, "HyperionEngine")),
-      m_shader_globals(nullptr)
+      m_shader_globals(nullptr),
+      m_swapchain_render_pass_id{}
 {
 }
 
@@ -136,8 +137,7 @@ void Engine::PrepareSwapchain()
         }));
     }
 
-    RenderPass::ID render_pass_id{};
-
+    /* Create renderpass */
     {
         auto render_pass = std::make_unique<RenderPass>(renderer::RenderPass::RENDER_PASS_STAGE_PRESENT, renderer::RenderPass::RENDER_PASS_INLINE);
         /* For our color attachment */
@@ -149,10 +149,10 @@ void Engine::PrepareSwapchain()
             .format = m_texture_format_defaults.Get(TEXTURE_FORMAT_DEFAULT_DEPTH)
         });
         
-        render_pass_id = AddRenderPass(std::move(render_pass));
+        m_swapchain_render_pass_id = AddRenderPass(std::move(render_pass));
     }
 
-    m_swapchain_render_container = std::make_unique<GraphicsPipeline>(shader_id, render_pass_id, GraphicsPipeline::Bucket::BUCKET_BUFFER);
+    m_swapchain_render_container = std::make_unique<GraphicsPipeline>(shader_id, GraphicsPipeline::Bucket::BUCKET_BUFFER);
 
     for (VkImage img : m_instance->swapchain->images) {
         auto image_view = std::make_unique<ImageView>();
@@ -181,7 +181,7 @@ void Engine::PrepareSwapchain()
         /* Now we add a depth buffer */
         HYPERION_ASSERT_RESULT(fbo->Get().AddAttachment(m_texture_format_defaults.Get(TEXTURE_FORMAT_DEFAULT_DEPTH)));
 
-        m_swapchain_render_container->AddFramebuffer(AddFramebuffer(std::move(fbo), render_pass_id));
+        m_swapchain_render_container->AddFramebuffer(AddFramebuffer(std::move(fbo), m_swapchain_render_pass_id));
     }
 
     m_swapchain_render_container->SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN);
@@ -191,6 +191,8 @@ void Engine::Initialize()
 {
     InitializeInstance();
     FindTextureFormatDefaults();
+
+    m_render_bucket_container.Create(this);
 
     m_shader_globals = new ShaderGlobals(m_instance->GetFrameHandler()->NumFrames());
     
@@ -293,10 +295,11 @@ void Engine::Compile()
 
     m_deferred_rendering.CreatePipeline(this);
 
-    m_post_processing.BuildPipelines(this);
+    m_post_processing.CreatePipelines(this);
 
-    m_swapchain_render_container->Create(this);
-    m_render_bucket_container.Create(this);
+    m_render_bucket_container.CreatePipelines(this);
+
+    m_swapchain_render_container->Create(this, GetRenderPass(m_swapchain_render_pass_id));
     m_compute_pipelines.CreateAll(this);
 }
 
@@ -309,30 +312,20 @@ void Engine::UpdateDescriptorData(uint32_t frame_index)
 
 void Engine::Render(CommandBuffer *primary, uint32_t frame_index)
 {
-    m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_OPAQUE).objects[0]->Get().BeginRenderPass(primary, 0, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    for (const auto &pipeline : m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_SKYBOX).objects) {
-        pipeline->Render(this, primary, frame_index);
-    }
+    const auto &skybox = m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_SKYBOX);
+    skybox.Render(this, primary, frame_index);
 
-    for (const auto &pipeline : m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_OPAQUE).objects) {
-        pipeline->Render(this, primary, frame_index);
-    }
-
-    m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_OPAQUE).objects[0]->Get().EndRenderPass(primary, 0);
+    const auto &opaque = m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_OPAQUE);
+    opaque.Render(this, primary, frame_index);
 }
 
 void Engine::RenderDeferred(CommandBuffer *primary, uint32_t frame_index)
 {
     m_deferred_rendering.Record(this, frame_index);
     m_deferred_rendering.Render(this, primary, frame_index);
-
-    m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_TRANSLUCENT).objects[0]->Get().BeginRenderPass(primary, 0, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-
-    for (const auto &pipeline : m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_TRANSLUCENT).objects) {
-        pipeline->Render(this, primary, frame_index);
-    }
-
-    m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_TRANSLUCENT).objects[0]->Get().EndRenderPass(primary, 0);
+    
+    const auto &bucket = m_render_bucket_container.GetBucket(GraphicsPipeline::Bucket::BUCKET_TRANSLUCENT);
+    bucket.Render(this, primary, frame_index);
 }
 
 void Engine::RenderPostProcessing(CommandBuffer *primary, uint32_t frame_index)
@@ -340,12 +333,24 @@ void Engine::RenderPostProcessing(CommandBuffer *primary, uint32_t frame_index)
     m_post_processing.Render(this, primary, frame_index);
 }
 
-void Engine::RenderSwapchain(CommandBuffer *command_buffer) const
+void Engine::RenderSwapchain(CommandBuffer *command_buffer)
 {
     auto &pipeline = m_swapchain_render_container->Get();
     const uint32_t acquired_image_index = m_instance->GetFrameHandler()->GetAcquiredImageIndex();
+    
+    auto *render_pass = GetRenderPass(m_swapchain_render_pass_id);
+    AssertThrow(render_pass != nullptr);
 
-    pipeline.BeginRenderPass(command_buffer, acquired_image_index, VK_SUBPASS_CONTENTS_INLINE);
+    auto *framebuffer = pipeline.GetConstructionInfo().fbos[acquired_image_index];
+    AssertThrow(framebuffer != nullptr);
+
+    render_pass->Get().Begin(
+        command_buffer,
+        framebuffer->GetFramebuffer(),
+        VkExtent2D{ uint32_t(framebuffer->GetWidth()), uint32_t(framebuffer->GetHeight())},
+        VK_SUBPASS_CONTENTS_INLINE
+    );
+    
     pipeline.Bind(command_buffer);
 
     m_instance->GetDescriptorPool().Bind(command_buffer, &pipeline, {{.count = 2}});
@@ -353,6 +358,6 @@ void Engine::RenderSwapchain(CommandBuffer *command_buffer) const
     /* Render full screen quad overlay to blit deferred + all post fx onto screen. */
     PostEffect::full_screen_quad->RenderVk(command_buffer, m_instance.get(), nullptr);
 
-    pipeline.EndRenderPass(command_buffer, acquired_image_index);
+    render_pass->Get().End(command_buffer);
 }
 } // namespace hyperion::v2

@@ -32,6 +32,16 @@ void DeferredRendering::CreateRenderPass(Engine *engine)
         .format = engine->GetDefaultFormat(Engine::TEXTURE_FORMAT_DEFAULT_COLOR)
     });
 
+    /* Dummy to match pipeline layout */
+    render_pass->Get().AddAttachment({
+        .format = engine->GetDefaultFormat(Engine::TEXTURE_FORMAT_DEFAULT_GBUFFER)
+    });
+
+    /* Dummy to match pipeline layout */
+    render_pass->Get().AddAttachment({
+        .format = engine->GetDefaultFormat(Engine::TEXTURE_FORMAT_DEFAULT_GBUFFER)
+    });
+
     /* Add depth attachment for reading the forward renderer's depth buffer before we render transparent objects */
     render_pass->Get().AddDepthAttachment(
         std::make_unique<renderer::AttachmentBase>(
@@ -57,10 +67,12 @@ void DeferredRendering::CreateFrameData(Engine *engine)
 
     auto fbo = std::make_unique<Framebuffer>(engine->GetInstance()->swapchain->extent.width, engine->GetInstance()->swapchain->extent.height);
     fbo->Get().AddAttachment(engine->GetDefaultFormat(Engine::TEXTURE_FORMAT_DEFAULT_COLOR));
+    fbo->Get().AddAttachment(engine->GetDefaultFormat(Engine::TEXTURE_FORMAT_DEFAULT_GBUFFER));
+    fbo->Get().AddAttachment(engine->GetDefaultFormat(Engine::TEXTURE_FORMAT_DEFAULT_GBUFFER));
     
 
     /* Add depth attachment */
-    auto forward_fbo = engine->GetFramebuffer(Framebuffer::ID{1});
+    auto forward_fbo = engine->GetFramebuffer(engine->GetRenderBucketContainer().GetBucket(GraphicsPipeline::BUCKET_OPAQUE).framebuffer);
     auto image_view = std::make_unique<ImageView>();
     HYPERION_ASSERT_RESULT(image_view->Create(engine->GetInstance()->GetDevice(), forward_fbo->Get().GetAttachmentImageInfos()[3].image.get()));
     fbo->Get().AddAttachment({

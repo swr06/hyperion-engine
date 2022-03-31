@@ -91,7 +91,7 @@ void PostEffect::CreateDescriptors(Engine *engine, uint32_t &binding_offset)
 
 void PostEffect::CreatePipeline(Engine *engine)
 {
-    auto pipeline = std::make_unique<GraphicsPipeline>(m_shader_id, m_render_pass_id, GraphicsPipeline::Bucket::BUCKET_BUFFER);
+    auto pipeline = std::make_unique<GraphicsPipeline>(m_shader_id, GraphicsPipeline::Bucket::BUCKET_BUFFER);
     pipeline->AddFramebuffer(m_framebuffer_id);
     pipeline->SetDepthWrite(false);
     pipeline->SetDepthTest(false);
@@ -137,10 +137,13 @@ void PostEffect::Record(Engine * engine, uint32_t frame_index)
     auto *command_buffer = (*m_frame_data)[frame_index].Get<CommandBuffer>();
     auto *pipeline = engine->GetGraphicsPipeline(m_pipeline_id);
 
+    auto *render_pass = engine->GetRenderPass(engine->GetRenderBucketContainer().GetBucket(GraphicsPipeline::BUCKET_BUFFER).render_pass);
+    AssertThrow(render_pass != nullptr);
+
     HYPERION_PASS_ERRORS(
         command_buffer->Record(
             engine->GetInstance()->GetDevice(),
-            pipeline->Get().GetConstructionInfo().render_pass,
+            &render_pass->Get(),
             [this, engine, pipeline](CommandBuffer *cmd) {
                 pipeline->Get().Bind(cmd);
                 
@@ -164,17 +167,28 @@ void PostEffect::Record(Engine * engine, uint32_t frame_index)
     AssertThrowMsg(result, "Failed to record command buffer. Message: %s", result.message);
 }
 
-void PostEffect::Render(Engine * engine, CommandBuffer *primary_command_buffer, uint32_t frame_index)
+void PostEffect::Render(Engine *engine, CommandBuffer *primary, uint32_t frame_index)
 {
     auto *pipeline = engine->GetGraphicsPipeline(m_pipeline_id);
 
-    pipeline->Get().BeginRenderPass(primary_command_buffer, 0, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    auto *render_pass = engine->GetRenderPass(engine->GetRenderBucketContainer().GetBucket(GraphicsPipeline::BUCKET_BUFFER).render_pass);
+    AssertThrow(render_pass != nullptr);
+
+    auto *framebuffer = engine->GetFramebuffer(m_framebuffer_id);
+    AssertThrow(framebuffer != nullptr);
+
+    render_pass->Get().Begin(
+        primary,
+        framebuffer->Get().GetFramebuffer(),
+        VkExtent2D{ uint32_t(framebuffer->Get().GetWidth()), uint32_t(framebuffer->Get().GetHeight())},
+        VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS
+    );
 
     auto *secondary_command_buffer = m_frame_data->At(frame_index).Get<CommandBuffer>();
 
-    HYPERION_ASSERT_RESULT(secondary_command_buffer->SubmitSecondary(primary_command_buffer));
-
-    pipeline->Get().EndRenderPass(primary_command_buffer, 0);
+    HYPERION_ASSERT_RESULT(secondary_command_buffer->SubmitSecondary(primary));
+    
+    render_pass->Get().End(primary);
 }
 
 
@@ -191,7 +205,7 @@ void PostProcessing::Create(Engine *engine)
     static const std::array<std::string, 1> filter_shader_names = {  "filter_pass" };
     m_filters.resize(filter_shader_names.size());
 
-    uint32_t binding_index = 6; /* hardcoded for now - start filters at this binding */
+    uint32_t binding_index = 8; /* hardcoded for now - start filters at this binding */
 
     /* TODO: use subpasses for gbuffer so we only have num_filters * num_frames descriptors */
     for (int i = 0; i < filter_shader_names.size(); i++) {
@@ -215,7 +229,7 @@ void PostProcessing::Destroy(Engine *engine)
     }
 }
 
-void PostProcessing::BuildPipelines(Engine *engine)
+void PostProcessing::CreatePipelines(Engine *engine)
 {
     for (auto &m_filter : m_filters) {
         m_filter->CreatePipeline(engine);

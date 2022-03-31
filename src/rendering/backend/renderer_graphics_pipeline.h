@@ -48,7 +48,6 @@ public:
              blend_enabled = false;
 
         ShaderProgram *shader = nullptr;
-        RenderPass *render_pass = nullptr;
         std::vector<FramebufferObject *> fbos;
     };
 
@@ -67,11 +66,11 @@ public:
     void SetScissor(int x, int y, uint32_t width, uint32_t height);
     void SetVertexInputMode(std::vector<VkVertexInputBindingDescription> &binding_descs, std::vector<VkVertexInputAttributeDescription> &vertex_attribs);
     
-    Result Create(Device *device, ConstructionInfo &&construction_info, DescriptorPool *descriptor_pool);
+    Result Create(Device *device, ConstructionInfo &&construction_info, RenderPass *render_pass, DescriptorPool *descriptor_pool);
     Result Destroy(Device *device);
 
-    void BeginRenderPass(CommandBuffer *cmd, size_t index, VkSubpassContents contents);
-    void EndRenderPass(CommandBuffer *cmd, size_t index);
+    /*void BeginRenderPass(CommandBuffer *cmd, size_t index, VkSubpassContents contents);
+    void EndRenderPass(CommandBuffer *cmd, size_t index);*/
     void Bind(CommandBuffer *cmd);
     void SubmitPushConstants(CommandBuffer *cmd) const;
 
@@ -87,7 +86,7 @@ public:
     } push_constants;
 
 private:
-    Result Rebuild(Device *device, DescriptorPool *descriptor_pool);
+    Result Rebuild(Device *device, RenderPass *render_pass, DescriptorPool *descriptor_pool);
     void UpdateDynamicStates(VkCommandBuffer cmd);
 
     std::vector<VkDynamicState> dynamic_states;

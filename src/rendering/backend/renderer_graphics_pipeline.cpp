@@ -86,7 +86,7 @@ std::vector<VkVertexInputAttributeDescription> GraphicsPipeline::BuildVertexAttr
     return this->vertex_attributes;
 }
 
-void GraphicsPipeline::BeginRenderPass(CommandBuffer *cmd, size_t index, VkSubpassContents contents)
+/*void GraphicsPipeline::BeginRenderPass(CommandBuffer *cmd, size_t index, VkSubpassContents contents)
 {
 
     m_construction_info.render_pass->Begin(
@@ -100,7 +100,7 @@ void GraphicsPipeline::BeginRenderPass(CommandBuffer *cmd, size_t index, VkSubpa
 void GraphicsPipeline::EndRenderPass(CommandBuffer *cmd, size_t index)
 {
     m_construction_info.render_pass->End(cmd);
-}
+}*/
 
 void GraphicsPipeline::SubmitPushConstants(CommandBuffer *cmd) const
 {
@@ -115,21 +115,28 @@ void GraphicsPipeline::SubmitPushConstants(CommandBuffer *cmd) const
 
 void GraphicsPipeline::Bind(CommandBuffer *cmd)
 {
+    AssertThrow(pipeline != nullptr);
+
     UpdateDynamicStates(cmd->GetCommandBuffer());
 
-    vkCmdBindPipeline(cmd->GetCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, this->pipeline);
+    vkCmdBindPipeline(cmd->GetCommandBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
     SubmitPushConstants(cmd);
 }
 
-void GraphicsPipeline::SetVertexInputMode(std::vector<VkVertexInputBindingDescription> &binding_descs,
+void GraphicsPipeline::SetVertexInputMode(
+    std::vector<VkVertexInputBindingDescription> &binding_descs,
     std::vector<VkVertexInputAttributeDescription> &attribs)
 {
     this->vertex_binding_descriptions = binding_descs;
     this->vertex_attributes = attribs;
 }
 
-Result GraphicsPipeline::Create(Device *device, ConstructionInfo &&construction_info, DescriptorPool *descriptor_pool)
+Result GraphicsPipeline::Create(
+    Device *device,
+    ConstructionInfo &&construction_info,
+    RenderPass *render_pass,
+    DescriptorPool *descriptor_pool)
 {
     m_construction_info = std::move(construction_info);
 
@@ -150,10 +157,13 @@ Result GraphicsPipeline::Create(Device *device, ConstructionInfo &&construction_
     static int x = 0;
     DebugLog(LogType::Debug, "Create Pipeline [%d]\n", x++);
 
-    return Rebuild(device, descriptor_pool);
+    return Rebuild(device, render_pass, descriptor_pool);
 }
 
-Result GraphicsPipeline::Rebuild(Device *device, DescriptorPool *descriptor_pool)
+Result GraphicsPipeline::Rebuild(
+    Device *device,
+    RenderPass *render_pass,
+    DescriptorPool *descriptor_pool)
 {
     BuildVertexAttributes(m_construction_info.vertex_attributes);
 
@@ -224,7 +234,7 @@ Result GraphicsPipeline::Rebuild(Device *device, DescriptorPool *descriptor_pool
 
     /* TODO: enable multisampling and the GPU feature required for it.  */
     std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments;
-    color_blend_attachments.resize(m_construction_info.render_pass->GetColorAttachments().size());
+    color_blend_attachments.resize(render_pass->GetColorAttachments().size());
 
     for (size_t i = 0; i < color_blend_attachments.size(); i++) {
         color_blend_attachments[i] = VkPipelineColorBlendAttachmentState{
@@ -312,7 +322,7 @@ Result GraphicsPipeline::Rebuild(Device *device, DescriptorPool *descriptor_pool
     pipeline_info.pDynamicState = &dynamic_state;
 
     pipeline_info.layout = layout;
-    pipeline_info.renderPass = m_construction_info.render_pass->GetRenderPass();
+    pipeline_info.renderPass = render_pass->GetRenderPass();
 
     pipeline_info.subpass = 0; /* Index of the subpass */
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;

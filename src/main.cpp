@@ -202,31 +202,7 @@ int main()
 
     engine.Initialize();
 
-    v2::RenderPass::ID render_pass_id{};
-    {
-        auto render_pass = std::make_unique<v2::RenderPass>(RenderPass::RENDER_PASS_STAGE_SHADER, RenderPass::RENDER_PASS_INLINE);
-
-        /* For our color attachment */
-        render_pass->Get().AddAttachment({
-            .format = engine.GetDefaultFormat(v2::Engine::TEXTURE_FORMAT_DEFAULT_COLOR)
-        });
-        /* For our normals attachment */
-        render_pass->Get().AddAttachment({
-            .format = engine.GetDefaultFormat(v2::Engine::TEXTURE_FORMAT_DEFAULT_GBUFFER)
-        });
-        /* For our positions attachment */
-        render_pass->Get().AddAttachment({
-            .format = engine.GetDefaultFormat(v2::Engine::TEXTURE_FORMAT_DEFAULT_GBUFFER)
-        });
-
-        render_pass->Get().AddAttachment({
-            .format = engine.GetDefaultFormat(v2::Engine::TEXTURE_FORMAT_DEFAULT_DEPTH)
-        });
-        
-        render_pass_id = engine.AddRenderPass(std::move(render_pass));
-    }
-
-    v2::Framebuffer::ID opaque_fbo_id = engine.AddFramebuffer(engine.GetInstance()->swapchain->extent.width, engine.GetInstance()->swapchain->extent.height, render_pass_id);
+    v2::Framebuffer::ID opaque_fbo_id = engine.GetRenderBucketContainer().GetBucket(v2::GraphicsPipeline::BUCKET_OPAQUE).framebuffer;
 
     {
         auto *descriptor_set_globals = engine.GetInstance()->GetDescriptorPool()
@@ -434,7 +410,7 @@ int main()
 
     v2::GraphicsPipeline::ID main_pipeline_id;
     {
-        auto pipeline = std::make_unique<v2::GraphicsPipeline>(mirror_shader_id, render_pass_id, v2::GraphicsPipeline::Bucket::BUCKET_OPAQUE);
+        auto pipeline = std::make_unique<v2::GraphicsPipeline>(mirror_shader_id, v2::GraphicsPipeline::Bucket::BUCKET_OPAQUE);
         pipeline->AddFramebuffer(opaque_fbo_id);
 
         auto monkey_spatial_id = engine.AddSpatial(std::make_unique<v2::Spatial>(
@@ -470,7 +446,7 @@ int main()
             {ShaderModule::Type::FRAGMENT, {FileByteReader(AssetManager::GetInstance()->GetRootDir() + "vkshaders/skybox_frag.spv").Read()}}
         }));
 
-        auto pipeline = std::make_unique<v2::GraphicsPipeline>(shader_id, render_pass_id, v2::GraphicsPipeline::Bucket::BUCKET_SKYBOX);
+        auto pipeline = std::make_unique<v2::GraphicsPipeline>(shader_id, v2::GraphicsPipeline::Bucket::BUCKET_SKYBOX);
         pipeline->SetCullMode(GraphicsPipeline::CullMode::FRONT);
         pipeline->SetDepthTest(false);
         pipeline->SetDepthWrite(false);
@@ -489,7 +465,7 @@ int main()
 
     v2::GraphicsPipeline::ID translucent_pipeline_id{};
     {
-        auto pipeline = std::make_unique<v2::GraphicsPipeline>(mirror_shader_id, engine.GetDeferredRenderer().GetRenderPassId(), v2::GraphicsPipeline::Bucket::BUCKET_TRANSLUCENT);
+        auto pipeline = std::make_unique<v2::GraphicsPipeline>(mirror_shader_id, v2::GraphicsPipeline::Bucket::BUCKET_TRANSLUCENT);
         pipeline->AddFramebuffer(engine.GetDeferredRenderer().GetFramebufferId());
         pipeline->SetBlendEnabled(true);
 

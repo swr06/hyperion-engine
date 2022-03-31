@@ -49,7 +49,7 @@ void DebugSetOutputStream(FILE *stream);
  * the release build will have function naming disabled. */
 
 #define DebugLogRaw(type, ...) \
-    DebugLog_(type, nullptr, 0, __VA_ARGS__);
+    DebugLog_(type, nullptr, 0, __VA_ARGS__)
 
 #ifdef HYPERION_BUILD_RELEASE
 #define DebugLog(type, ...) \
@@ -59,7 +59,7 @@ void DebugLog_(LogType type, const char *fmt, ...);
 #else
 //#define DebugLog(type, fmt) DebugLog(type, HYP_DEBUG_FUNC_SHORT, HYP_DEBUG_LINE, fmt)
 #define DebugLog(type, ...) \
-    DebugLog_(type, HYP_DEBUG_FUNC_SHORT, HYP_DEBUG_LINE, __VA_ARGS__);
+    DebugLog_(type, HYP_DEBUG_FUNC_SHORT, HYP_DEBUG_LINE, __VA_ARGS__)
 
 void DebugLog_(LogType type, const char *callee, uint32_t line, const char *fmt, ...);
 #endif

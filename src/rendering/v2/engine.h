@@ -55,6 +55,9 @@ public:
     inline DeferredRendering &GetDeferredRenderer() { return m_deferred_rendering; }
     inline const DeferredRendering &GetDeferredRenderer() const { return m_deferred_rendering; }
 
+    inline RenderBucketContainer &GetRenderBucketContainer() { return m_render_bucket_container; }
+    inline const RenderBucketContainer &GetRenderBucketContainer() const { return m_render_bucket_container; }
+
     inline Image::InternalFormat GetDefaultFormat(TextureFormatDefault type) const
         { return m_texture_format_defaults.Get(type); }
 
@@ -152,8 +155,9 @@ public:
     {
         const auto bucket = pipeline->GetBucket();
 
-        GraphicsPipeline::ID id = m_render_bucket_container.GetBucket(bucket)
-            .Add(this, std::move(pipeline), std::move(args)...);
+        auto &render_bucket = m_render_bucket_container.GetBucket(bucket);
+
+        GraphicsPipeline::ID id = render_bucket.AddGraphicsPipeline(this, std::move(pipeline), std::move(args)...);
 
         id.bucket = bucket;
 
@@ -162,10 +166,10 @@ public:
 
     template <class ...Args>
     void RemoveGraphicsPipeline(GraphicsPipeline::ID id, Args &&... args)
-        { return m_render_bucket_container.GetBucket(id.bucket).Remove(this, id, std::move(args)...); }
+        { return m_render_bucket_container.GetBucket(id.bucket).RemoveGraphicsPipeline(this, id, std::move(args)...); }
 
     inline GraphicsPipeline *GetGraphicsPipeline(GraphicsPipeline::ID id)
-        { return m_render_bucket_container.GetBucket(id.bucket).Get(id); }
+        { return m_render_bucket_container.GetBucket(id.bucket).pipelines.Get(id); }
 
     inline const GraphicsPipeline *GetGraphicsPipeline(GraphicsPipeline::ID id) const
         { return const_cast<Engine*>(this)->GetGraphicsPipeline(id); }
@@ -211,9 +215,7 @@ public:
     void Render(CommandBuffer *primary, uint32_t frame_index);
     void RenderDeferred(CommandBuffer *primary, uint32_t frame_index);
     void RenderPostProcessing(CommandBuffer *primary, uint32_t frame_index);
-    void RenderSwapchain(CommandBuffer *command_buffer) const;
-
-    std::unique_ptr<GraphicsPipeline> m_swapchain_render_container;
+    void RenderSwapchain(CommandBuffer *command_buffer);
 
 
     ShaderGlobals *m_shader_globals;
@@ -238,6 +240,9 @@ private:
     ObjectHolder<ComputePipeline> m_compute_pipelines{.defer_create = true};
 
     RenderBucketContainer m_render_bucket_container;
+
+    std::unique_ptr<GraphicsPipeline> m_swapchain_render_container;
+    RenderPass::ID m_swapchain_render_pass_id;
 };
 
 } // namespace hyperion::v2

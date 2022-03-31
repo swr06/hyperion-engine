@@ -79,7 +79,7 @@ public:
 
     void Create(Engine *engine);
     void Destroy(Engine *engine);
-    void BuildPipelines(Engine *engine);
+    void CreatePipelines(Engine *engine);
     void Render(Engine *engine, CommandBuffer *primary, uint32_t frame_index) const;
 
 private:

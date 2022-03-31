@@ -25,7 +25,6 @@ using renderer::PerFrameData;
 class Engine;
 
 class GraphicsPipeline : public EngineComponent<renderer::GraphicsPipeline> {
-    friend class Engine;
     friend class Spatial;
 
 public:
@@ -49,13 +48,12 @@ public:
             { return value < other.value && bucket < other.bucket; }
     };
 
-    GraphicsPipeline(Shader::ID shader_id, RenderPass::ID render_pass_id, Bucket bucket);
+    GraphicsPipeline(Shader::ID shader_id, Bucket bucket);
     GraphicsPipeline(const GraphicsPipeline &other) = delete;
     GraphicsPipeline &operator=(const GraphicsPipeline &other) = delete;
     ~GraphicsPipeline();
 
     inline Shader::ID GetShaderID() const { return m_shader_id; }
-    inline RenderPass::ID GetRenderPassID() const { return m_render_pass_id; }
     inline Bucket GetBucket() const { return m_bucket; }
 
     inline const MeshInputAttributeSet &GetVertexAttributes() const { return m_vertex_attributes; }
@@ -99,17 +97,16 @@ public:
     inline void RemoveFramebuffer(Framebuffer::ID id) { m_fbo_ids.Remove(id); }
     
     /* Build pipeline */
-    void Create(Engine *engine);
+    void Create(Engine *engine, RenderPass *render_pass);
     void Destroy(Engine *engine);
+
+    void Render(Engine *engine, CommandBuffer *primary, RenderPass *render_pass, uint32_t frame_index);
 
 private:
     /* Called from Spatial - remove the pointer */
     void OnSpatialRemoved(Spatial *spatial);
 
-    void Render(Engine *engine, CommandBuffer *primary_command_buffer, uint32_t frame_index);
-
     Shader::ID m_shader_id;
-    RenderPass::ID m_render_pass_id;
     Bucket m_bucket;
     VkPrimitiveTopology m_topology;
     renderer::GraphicsPipeline::CullMode m_cull_mode;
