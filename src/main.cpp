@@ -82,18 +82,7 @@ using namespace hyperion;
 
 class SceneEditor : public Game {
 public:
-    std::vector<std::shared_ptr<Node>> m_raytested_entities;
-    std::unordered_map<HashCode_t, std::shared_ptr<Node>> m_hit_to_entity;
-    std::shared_ptr<Node> m_selected_node;
-    bool m_dragging_node = false;
-    float m_dragging_timer = 0.0f;
-    bool m_left_click_left = false;
-    RaytestHit m_ray_hit;
-    bool m_is_ray_hit = false;
     std::vector<std::thread> m_threads;
-
-    std::shared_ptr<ui::UIText> m_selected_node_text;
-    std::shared_ptr<ui::UIButton> m_rotate_mode_btn;
 
     SceneEditor(const RenderWindow &window)
         : Game(window)
@@ -133,83 +122,6 @@ public:
         return cubemap;
     }
 
-    void PerformRaytest()
-    {
-        m_raytested_entities.clear();
-
-        Ray ray;
-        ray.m_direction = GetCamera()->GetDirection();
-        ray.m_direction.Normalize();
-        ray.m_position = GetCamera()->GetTranslation();
-
-
-        using Intersection_t = std::pair<std::shared_ptr<Node>, RaytestHit>;
-
-        RaytestHit intersection;
-        std::vector<Intersection_t> intersections = { { GetScene(), intersection } };
-
-        while (true) {
-            std::vector<Intersection_t> new_intersections;
-
-            for (auto& it : intersections) {
-                for (size_t i = 0; i < it.first->NumChildren(); i++) {
-                    if (const auto &child = it.first->GetChild(i)) {
-                        BoundingBox aabb = child->GetAABB();
-
-                        if (aabb.IntersectRay(ray, intersection)) {
-                            new_intersections.push_back({ child, intersection });
-                        }
-                    }
-                }
-            }
-
-            if (new_intersections.empty()) {
-                break;
-            }
-
-            intersections = new_intersections;
-        }
-
-        if (intersections.empty()) {
-            return;
-        }
-
-        // RAY HIT POSITION / NORMAL
-
-        RaytestHitList_t mesh_intersections;
-        m_hit_to_entity.clear();
-
-        for (Intersection_t& it : intersections) {
-            it.first->AddControl(std::make_shared<BoundingBoxControl>());
-
-            m_raytested_entities.push_back(it.first);
-
-            if (auto renderable = it.first->GetRenderable()) {
-                RaytestHitList_t entity_hits;
-                if (renderable->IntersectRay(ray, it.first->GetGlobalTransform(), entity_hits)) {
-                    mesh_intersections.insert(mesh_intersections.end(), entity_hits.begin(), entity_hits.end());
-
-                    for (auto& hit : entity_hits) {
-                        m_hit_to_entity[hit.GetHashCode().Value()] = it.first;
-                    }
-                }
-
-            }
-        }
-
-        if (mesh_intersections.empty()) {
-            m_is_ray_hit = false;
-            return;
-        }
-
-        std::sort(mesh_intersections.begin(), mesh_intersections.end(), [=](const RaytestHit& a, const RaytestHit& b) {
-            return a.hitpoint.Distance(GetCamera()->GetTranslation()) < b.hitpoint.Distance(GetCamera()->GetTranslation());
-        });
-
-        m_ray_hit = mesh_intersections[0];
-        m_is_ray_hit = true;
-    }
-
     void Initialize()
     {
 
@@ -246,18 +158,18 @@ public:
 
         GetScene()->AddControl(std::make_shared<SphericalHarmonicsControl>(Vector3(0.0f), BoundingBox(-25.0f, 25.0f)));
 
-        auto model = asset_manager->LoadFromFile<Node>("models/sponza/sponza.obj");
+        auto model = asset_manager->LoadFromFile<Node>("models/salle_de_bain/salle_de_bain.obj");
         model->SetName("model");
-        model->Scale(Vector3(0.01f));
+        model->Scale(Vector3(0.2f));
 
         // Add an AudioControl, provide it with an AudioSource (which is an instance of Loadable)
         auto audio_ctrl = std::make_shared<AudioControl>(
             AssetManager::GetInstance()->LoadFromFile<AudioSource>("sounds/cartoon001.wav"));
 
         // Add that AudioControl to your node so it is associated with a 3d space
-        model->AddControl(audio_ctrl);
-        audio_ctrl->GetSource()->SetLoop(true);
-        audio_ctrl->GetSource()->Play();
+        //model->AddControl(audio_ctrl);
+        //audio_ctrl->GetSource()->SetLoop(true);
+        //audio_ctrl->GetSource()->Play();
 
         for (size_t i = 0; i < model->NumChildren(); i++) {
             if (model->GetChild(i) == nullptr) {
@@ -345,7 +257,7 @@ public:
         shadow_node->AddControl(std::make_shared<CameraFollowControl>(GetCamera()));
         GetScene()->AddChild(shadow_node);
 
-        bool add_spheres = true;
+        bool add_spheres = false;
 
         if (add_spheres) {
 
@@ -370,113 +282,10 @@ public:
                 }
             }
         }
-
-        GetInputManager()->RegisterKeyEvent(KEY_1, InputEvent([=](bool pressed) {
-            if (!pressed) {
-                return;
-            }
-
-            Environment::GetInstance()->SetShadowsEnabled(!Environment::GetInstance()->ShadowsEnabled());
-        }));
-
-        GetInputManager()->RegisterKeyEvent(KEY_3, InputEvent([=](bool pressed) {
-            if (!pressed) {
-                return;
-            }
-
-            ProbeManager::GetInstance()->SetEnvMapEnabled(!ProbeManager::GetInstance()->EnvMapEnabled());
-        }));
-
-        GetInputManager()->RegisterKeyEvent(KEY_4, InputEvent([=](bool pressed) {
-            if (!pressed) {
-                return;
-            }
-
-            ProbeManager::GetInstance()->SetSphericalHarmonicsEnabled(!ProbeManager::GetInstance()->SphericalHarmonicsEnabled());
-        }));
-
-        GetInputManager()->RegisterKeyEvent(KEY_5, InputEvent([=](bool pressed) {
-            if (!pressed) {
-                return;
-            }
-
-            ProbeManager::GetInstance()->SetVCTEnabled(!ProbeManager::GetInstance()->VCTEnabled());
-        }));
-
-        InputEvent raytest_event([=](bool pressed)
-            {
-                if (!pressed) {
-                    return;
-                }
-
-                if (m_selected_node != nullptr) {
-                    m_selected_node->RemoveControl(m_selected_node->GetControl<BoundingBoxControl>(0));
-                }
-
-                PerformRaytest();
-
-                if (!m_is_ray_hit) {
-                    return;
-                }
-
-                ex_assert(m_hit_to_entity.find(m_ray_hit.GetHashCode().Value()) != m_hit_to_entity.end());
-
-                auto node = m_hit_to_entity[m_ray_hit.GetHashCode().Value()];
-
-                m_selected_node = node;
-                m_selected_node->AddControl(std::make_shared<BoundingBoxControl>());
-
-                std::stringstream ss;
-                ss << "Selected object: ";
-                ss << m_selected_node->GetName();
-                ss << " ";
-                ss << m_selected_node->GetGlobalTranslation();
-                ss << " " << m_selected_node->GetAABB();
-                
-                m_selected_node_text->SetText(ss.str());
-            });
-
-        GetInputManager()->RegisterClickEvent(MOUSE_BTN_LEFT, raytest_event);
     }
 
     void Logic(double dt)
     {
-        if (GetInputManager()->IsButtonDown(MouseButton::MOUSE_BTN_LEFT) && m_selected_node != nullptr) {
-            //std::cout << "Left button down\n";
-            if (!m_dragging_node) {
-                m_dragging_timer += dt;
-
-                if (m_dragging_timer >= 0.5f) {
-                    m_dragging_node = true;
-                }
-            } else {
-                PerformRaytest();
-
-                if (m_is_ray_hit) {
-                    // check what it is intersecting with
-                    auto intersected_with = m_hit_to_entity[m_ray_hit.GetHashCode().Value()];
-
-                    ex_assert(intersected_with != nullptr);
-
-                    if (intersected_with != m_selected_node) {
-                        m_selected_node->SetGlobalTranslation(m_ray_hit.hitpoint);
-                        m_selected_node->UpdateTransform();
-
-                        std::stringstream ss;
-                        ss << "Selected object: ";
-                        ss << m_selected_node->GetName();
-                        ss << " ";
-                        ss << m_selected_node->GetGlobalTranslation();
-
-                        m_selected_node_text->SetText(ss.str());
-                    }
-                }
-            }
-        } else {
-            m_dragging_node = false;
-            m_dragging_timer = 0.0f;
-        }
-
         AudioManager::GetInstance()->SetListenerPosition(GetCamera()->GetTranslation());
         AudioManager::GetInstance()->SetListenerOrientation(GetCamera()->GetDirection(), GetCamera()->GetUpVector());
 
