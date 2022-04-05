@@ -90,23 +90,21 @@ std::shared_ptr<Loadable> AssetManager::LoadFromFile(const std::string &path, bo
     }
 
     for (const auto &path : try_paths) {
-        try {
-            auto &loader = GetLoader(path);
+        auto &loader = GetLoader(path);
 
-            if (loader != nullptr) {
-                auto loaded = loader->LoadFromFile(path);
+        if (loader != nullptr) {
+            auto loaded = loader->LoadFromFile(path);
 
-                if (loaded) {
-                    loaded->SetFilePath(path);
+            if (loaded) {
+                loaded->SetFilePath(path);
 
-                    loaded_assets[path] = loaded;
-                }
+                loaded_assets[path] = loaded;
 
                 return loaded;
             }
-        } catch (std::string err) {
-            std::cout << "[" << path << "]: " << "File load error: " << err << "\n";
         }
+
+        std::cout << "[" << path << "]: " << " Could not load file" << "\n";
     }
 
     return nullptr;

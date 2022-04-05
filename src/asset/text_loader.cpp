@@ -7,6 +7,7 @@ namespace hyperion {
 std::shared_ptr<Loadable> TextLoader::LoadFromFile(const std::string &filepath)
 {
     std::ifstream file(filepath);
+
     if (!file.is_open()) {
         return nullptr;
     }
