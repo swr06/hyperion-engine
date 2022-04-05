@@ -112,31 +112,6 @@ public:
         AudioManager::Deinitialize();
     }
 
-    void InitParticleSystem()
-    {
-        ParticleConstructionInfo particle_generator_info;
-        particle_generator_info.m_origin_randomness = Vector3(5.0f, 0.5f, 5.0f);
-        particle_generator_info.m_velocity = Vector3(0.5f, -3.0f, 0.5f);
-        particle_generator_info.m_velocity_randomness = Vector3(1.3f, 0.0f, 1.3f);
-        particle_generator_info.m_scale = Vector3(0.05);
-        particle_generator_info.m_gravity = Vector3(0, -9, 0);
-        particle_generator_info.m_max_particles = 300;
-        particle_generator_info.m_lifespan = 1.0;
-        particle_generator_info.m_lifespan_randomness = 1.5;
-
-        auto particle_node = std::make_shared<Node>();
-        particle_node->SetName("Particle node");
-        // particle_node->SetRenderable(std::make_shared<ParticleRenderer>(particle_generator_info));
-        particle_node->GetMaterial().SetTexture(MATERIAL_TEXTURE_DIFFUSE_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/test_snowflake.png"));
-        particle_node->AddControl(std::make_shared<ParticleEmitterControl>(GetCamera(), particle_generator_info));
-        particle_node->SetLocalScale(Vector3(1.5));
-        particle_node->AddControl(std::make_shared<BoundingBoxControl>());
-        particle_node->SetLocalTranslation(Vector3(0, 165, 0));
-        particle_node->AddControl(std::make_shared<CameraFollowControl>(GetCamera(), Vector3(0, 2, 0)));
-
-        GetScene()->AddChild(particle_node);
-    }
-
     std::shared_ptr<Cubemap> InitCubemap()
     {
         AssetManager *asset_manager = AssetManager::GetInstance();
@@ -251,7 +226,7 @@ public:
         Environment::GetInstance()->SetNumCascades(1);
         Environment::GetInstance()->GetProbeManager()->SetEnvMapEnabled(false);
         Environment::GetInstance()->GetProbeManager()->SetSphericalHarmonicsEnabled(true);
-        Environment::GetInstance()->GetProbeManager()->SetVCTEnabled(false);
+        Environment::GetInstance()->GetProbeManager()->SetVCTEnabled(true);
 
         GetRenderer()->GetDeferredPipeline()->GetPreFilterStack()->AddFilter<SSAOFilter>("ssao", 5);
         GetRenderer()->GetDeferredPipeline()->GetPreFilterStack()->AddFilter<FXAAFilter>("fxaa", 6);
@@ -262,282 +237,113 @@ public:
         Environment::GetInstance()->GetSun().SetDirection(Vector3(0.2, 1, 0.2).Normalize());
         Environment::GetInstance()->GetSun().SetIntensity(700000.0f);
         Environment::GetInstance()->GetSun().SetColor(Vector4(1.0, 0.8, 0.65, 1.0));
-
-
+        
         GetCamera()->SetTranslation(Vector3(0, 8, 0));
 
-        // Initialize particle system
-        // InitParticleSystem();
-
-        auto ui_text = std::make_shared<ui::UIText>("text_test", "Hyperion 0.1.0\n"
-            "Press 1 to toggle shadows\n"
-            "Press 3 to toggle environment cubemapping\n"
-            "Press 4 to toggle spherical harmonics mapping\n"
-            "Press 5 to toggle voxel cone tracing\n");
-        ui_text->SetLocalTranslation2D(Vector2(-1.0, 1.0));
-        ui_text->SetLocalScale2D(Vector2(20));
-        GetUI()->AddChild(ui_text);
-        GetUIManager()->RegisterUIObject(ui_text);
-
-        auto fps_counter = std::make_shared<ui::UIText>("fps_coutner", "- FPS");
-        fps_counter->SetLocalTranslation2D(Vector2(0.8, 1.0));
-        fps_counter->SetLocalScale2D(Vector2(30));
-        GetUI()->AddChild(fps_counter);
-        GetUIManager()->RegisterUIObject(fps_counter);
-
-        m_selected_node_text = std::make_shared<ui::UIText>("selected_node_text", "No object selected");
-        m_selected_node_text->SetLocalTranslation2D(Vector2(-1.0, -0.8));
-        m_selected_node_text->SetLocalScale2D(Vector2(15));
-        GetUI()->AddChild(m_selected_node_text);
-        GetUIManager()->RegisterUIObject(m_selected_node_text);
-
-        m_rotate_mode_btn = std::make_shared<ui::UIButton>("rotate_mode");
-        m_rotate_mode_btn->SetLocalTranslation2D(Vector2(-1.0, -0.6));
-        m_rotate_mode_btn->SetLocalScale2D(Vector2(15));
-        GetUI()->AddChild(m_rotate_mode_btn);
-        GetUIManager()->RegisterUIObject(m_rotate_mode_btn);
-
         auto cm = InitCubemap();
-
-        //GetScene()->AddControl(std::make_shared<SkyboxControl>(GetCamera(), nullptr));
+        
         GetScene()->AddControl(std::make_shared<SkydomeControl>(GetCamera()));
 
         GetScene()->AddControl(std::make_shared<SphericalHarmonicsControl>(Vector3(0.0f), BoundingBox(-25.0f, 25.0f)));
 
+        auto model = asset_manager->LoadFromFile<Node>("models/sponza/sponza.obj");
+        model->SetName("model");
+        model->Scale(Vector3(0.01f));
 
-#if 1
+        // Add an AudioControl, provide it with an AudioSource (which is an instance of Loadable)
+        auto audio_ctrl = std::make_shared<AudioControl>(
+            AssetManager::GetInstance()->LoadFromFile<AudioSource>("sounds/cartoon001.wav"));
 
-        //m_threads.emplace_back(std::thread([scene = GetScene(), asset_manager]() {
-            auto model = asset_manager->LoadFromFile<Node>("models/sponza/sponza.obj");
-            model->SetName("model");
-            model->Scale(Vector3(0.01f));
+        // Add that AudioControl to your node so it is associated with a 3d space
+        model->AddControl(audio_ctrl);
+        audio_ctrl->GetSource()->SetLoop(true);
+        audio_ctrl->GetSource()->Play();
 
-            // Add an AudioControl, provide it with an AudioSource (which is an instance of Loadable)
-            auto audio_ctrl = std::make_shared<AudioControl>(
-                AssetManager::GetInstance()->LoadFromFile<AudioSource>("sounds/cartoon001.wav"));
-
-            // Add that AudioControl to your node so it is associated with a 3d space
-            model->AddControl(audio_ctrl);
-            audio_ctrl->GetSource()->SetLoop(true);
-            audio_ctrl->GetSource()->Play();
-
-            for (size_t i = 0; i < model->NumChildren(); i++) {
-                if (model->GetChild(i) == nullptr) {
-                    continue;
-                }
-
-                if (model->GetChild(i)->GetRenderable() == nullptr) {
-                    continue;
-                }
-
-                if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Branches")) {
-                    model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                    model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Floor")) {
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.05f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Leaves")) {
-                    model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                    model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:TableWood")) {
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.05f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Transluscent")) {
-                    model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                    model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
-                    model->GetChild(i)->GetMaterial().diffuse_color = Vector4(1.0, 1.0, 1.0, 0.5f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.05f);
-                }
-
-                if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Bin")) {
-
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.9f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.7f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Ceramic")) {
-
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.1f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.1f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Mirror")) {
-
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.9f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.01f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Plastic")) {
-
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.9f);
-                }
-
-                if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "leaf")) {
-                    model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                    model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Material__57")) {
-                    model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                    model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "vase")) {
-
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.6f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "chain")) {
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "flagpole")) {
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                } else {
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
-                    model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 1.0f);
-                }
+        for (size_t i = 0; i < model->NumChildren(); i++) {
+            if (model->GetChild(i) == nullptr) {
+                continue;
             }
 
-            model->AddControl(std::make_shared<GIProbeControl>(Vector3(0.0f, 1.0f, 0.0f)));
-            model->AddControl(std::make_shared<EnvMapProbeControl>(Vector3(0.0f, 3.0f, 4.0f)));
-            GetScene()->AddChild(model);
-        //}));
-#else
-        /*auto terrain = asset_manager->LoadFromFile<Node>("models/tmp_terrain.obj");
-        terrain->Rotate(Quaternion(Vector3::UnitX(), MathUtil::DegToRad(90.0f)));
-        terrain->Scale(20.0f);
-        //terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture("DiffuseMap", asset_manager->LoadFromFile<Texture>("textures/forest-floor-unity/forest_floor_albedo.png"));
-        ///terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture("ParallaxMap", asset_manager->LoadFromFile<Texture>("textures/forest-floor-unity/forest_floor_Height.png"));
-        //terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture("NormalMap", asset_manager->LoadFromFile<Texture>("textures/forest-floor-unity/forest_floor_Normal-ogl.png"));
-        //terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture("AoMap", asset_manager->LoadFromFile<Texture>("textures/forest-floor-unity/forest_floor-ao.png"));
-        //terrain->GetChild(0)->GetSpatial().GetMaterial().SetParameter(MATERIAL_PARAMETER_UV_SCALE, Vector2(50.0f));
+            if (model->GetChild(i)->GetRenderable() == nullptr) {
+                continue;
+            }
 
-        // GetMaterial().SetTexture("BaseTerrainColorMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/snow2/rock-snow-ice1-2k_Base_Color.png"));
-        // GetMaterial().SetTexture("BaseTerrainNormalMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/snow2/rock-snow-ice1-2k_Normal-ogl.png"));
-        // GetMaterial().SetTexture("BaseTerrainParallaxMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/snow2/rock-snow-ice1-2k_Height.png"));
-        // GetMaterial().SetTexture("BaseTerrainAoMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/snow2/rock-snow-ice1-2k_Ambient_Occlusion.png"));
+            if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Branches")) {
+                model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
+                model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Floor")) {
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.05f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Leaves")) {
+                model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
+                model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:TableWood")) {
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.05f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "grey_and_white_room:Transluscent")) {
+                model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
+                model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
+                model->GetChild(i)->GetMaterial().diffuse_color = Vector4(1.0, 1.0, 1.0, 0.5f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.05f);
+            }
 
-        // GetMaterial().SetTexture("SlopeColorMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/dirtwithrocks-ogl/dirtwithrocks_Base_Color.png"));
-        // GetMaterial().SetTexture("SlopeNormalMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/dirtwithrocks-ogl/dirtwithrocks_Normal-ogl.png"));
-        // GetMaterial().SetTexture("SlopeParallaxMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/dirtwithrocks-ogl/dirtwithrocks_Height.png"));
-        // GetMaterial().SetTexture("SlopeAoMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/dirtwithrocks-ogl/dirtwithrocks_AmbientOcculusion.png"));
+            if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Bin")) {
 
-        //GetMaterial().SetTexture("DiffuseMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/grass3.jpg"));
-        //GetMaterial().SetTexture("NormalMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/grass_nrm.jpg"));
-        terrain->GetChild(0)->GetSpatial().GetRenderable()->SetShader(ShaderManager::GetInstance()->GetShader<TerrainShader>(ShaderProperties()));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_DIFFUSE_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/patchy-meadow1-ue/patchy-meadow1_albedo.png")); // for vct
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_BASE_TERRAIN_COLOR_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/patchy-meadow1-ue/patchy-meadow1_albedo.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_BASE_TERRAIN_NORMAL_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/patchy-meadow1-ue/patchy-meadow1_normal-dx.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_BASE_TERRAIN_AO_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/patchy-meadow1-ue/patchy-meadow1_ao.png"));
-        //terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture("BaseTerrainColorMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/rocky_dirt1-ue/rocky_dirt1-albedo.png"));
-        //terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture("BaseTerrainNormalMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/rocky_dirt1-ue/rocky_dirt1-normal-dx.png"));
-        //terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture("BaseTerrainAoMap", AssetManager::GetInstance()->LoadFromFile<Texture>("textures/rocky_dirt1-ue/rocky_dirt1-ao.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_TERRAIN_LEVEL1_COLOR_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/damp-rocky-ground-ue/damp-rocky-ground1-albedo.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_TERRAIN_LEVEL1_NORMAL_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/damp-rocky-ground-ue/damp-rocky-ground1-Normal-dx.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_TERRAIN_LEVEL1_AO_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/damp-rocky-ground-ue/damp-rocky-ground1-ao.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_TERRAIN_LEVEL2_COLOR_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/forest-floor-unity/forest_floor_albedo.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_TERRAIN_LEVEL2_NORMAL_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/forest-floor-unity/forest_floor_Normal-ogl.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_TERRAIN_LEVEL2_AO_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/forest-floor-unity/forest_floor-ao.png"));
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetTexture(MATERIAL_TEXTURE_SPLAT_MAP, AssetManager::GetInstance()->LoadFromFile<Texture>("textures/splat.png"));
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.9f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.7f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Ceramic")) {
 
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.95f);
-        terrain->GetChild(0)->GetSpatial().GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.0f);
-        terrain->Scale({ 2, 2.5, 2 });
-        //terrain->GetChild(0)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.1f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.1f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Mirror")) {
 
-        //tmp->AddControl(std::make_shared<EnvMapProbeControl>(Vector3(0, 0, 0), BoundingBox(Vector3(-15, 5, -15), Vector3(15, 5, 15))));
-        terrain->AddControl(std::make_shared<GIProbeControl>(Vector3(0, 0, 0)));
-        GetScene()->AddChild(terrain);
-        terrain->Move({ 5, 0, -5 });
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.9f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.01f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Plastic")) {
 
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.9f);
+            }
 
-        auto tree = asset_manager->LoadFromFile<Node>("models/conifer/Conifer_Low.obj");
-        for (size_t i = 0; i < tree->NumChildren(); i++) {
-            if (auto child = tree->GetChild(i)) {
-                //child->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                child->GetSpatial().GetMaterial().alpha_blended = true;
-                child->GetSpatial().GetMaterial().cull_faces = MaterialFace_None;
+            if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "leaf")) {
+                model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
+                model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "Material__57")) {
+                model->GetChild(i)->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
+                model->GetChild(i)->GetSpatial().GetMaterial().alpha_blended = true;
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "vase")) {
+
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.6f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "chain")) {
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
+            } else if (StringUtil::StartsWith(model->GetChild(i)->GetName(), "flagpole")) {
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
+            } else {
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.04f);
+                model->GetChild(i)->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 1.0f);
             }
         }
-        tree->SetLocalTranslation({ 21.f, 6.4f, -4.f });
-        tree->Scale(0.05f);
-        GetScene()->AddChild(tree);
 
-        auto tree2 = asset_manager->LoadFromFile<Node>("models/conifer/Conifer_Low.obj");
-        for (size_t i = 0; i < tree2->NumChildren(); i++) {
-            if (auto child = tree2->GetChild(i)) {
-                //child->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                child->GetSpatial().GetMaterial().alpha_blended = true;
-                child->GetSpatial().GetMaterial().cull_faces = MaterialFace_None;
-            }
-        }
-        tree2->SetLocalTranslation({ 22.f, 6.4f, -5.7f });
-        tree2->SetLocalScale(0.059f);
-        tree2->Rotate(Quaternion(Vector3::UnitY(), MathUtil::DegToRad(35.0f)));
-        GetScene()->AddChild(tree2);
-
-        auto tree3 = asset_manager->LoadFromFile<Node>("models/conifer/Conifer_Low.obj");
-        for (size_t i = 0; i < tree3->NumChildren(); i++) {
-            if (auto child = tree3->GetChild(i)) {
-                //child->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                child->GetSpatial().GetMaterial().alpha_blended = true;
-                child->GetSpatial().GetMaterial().cull_faces = MaterialFace_None;
-            }
-        }
-        tree3->SetLocalTranslation({ 24.f, 6.3f, -3.7f });
-        tree3->SetLocalScale(0.045f);
-        tree3->Rotate(Quaternion(Vector3::UnitY(), MathUtil::DegToRad(-35.0f)));
-        GetScene()->AddChild(tree3);
-
-        auto tree4 = asset_manager->LoadFromFile<Node>("models/conifer/fir.obj");
-        for (size_t i = 0; i < tree4->NumChildren(); i++) {
-            if (auto child = tree4->GetChild(i)) {
-                //child->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                child->GetSpatial().GetMaterial().alpha_blended = true;
-                child->GetSpatial().GetMaterial().cull_faces = MaterialFace_None;
-            }
-        }
-        tree4->SetLocalTranslation({ 24.f, 6.3f, -1.7f });
-        tree4->SetLocalScale(0.05f);
-        tree4->Rotate(Quaternion(Vector3::UnitY(), MathUtil::DegToRad(-35.0f)));
-        GetScene()->AddChild(tree4);
-
-        auto tree5 = asset_manager->LoadFromFile<Node>("models/conifer/fir.obj");
-        for (size_t i = 0; i < tree5->NumChildren(); i++) {
-            if (auto child = tree5->GetChild(i)) {
-                //child->GetSpatial().SetBucket(Spatial::Bucket::RB_TRANSPARENT);
-                child->GetSpatial().GetMaterial().alpha_blended = true;
-                child->GetSpatial().GetMaterial().cull_faces = MaterialFace_None;
-            }
-        }
-        tree5->SetLocalTranslation({ 27.f, 7.f, -1.f });
-        tree5->SetLocalScale(0.045f);
-        tree5->Rotate(Quaternion(Vector3::UnitY(), MathUtil::DegToRad(-76.0f)));
-        GetScene()->AddChild(tree5);*/
-#endif
-        /*auto house = asset_manager->LoadFromFile<Node>("models/house.obj");
-        for (size_t i = 0; i < house->NumChildren(); i++) {
-            if (auto &child = house->GetChild(i)) {
-                child->GetMaterial().SetParameter(MATERIAL_PARAMETER_ROUGHNESS, 0.8f);
-                child->GetMaterial().SetParameter(MATERIAL_PARAMETER_METALNESS, 0.05f);
-            }
-        }
-        GetScene()->AddChild(house);*/
-
+        model->AddControl(std::make_shared<GIProbeControl>(Vector3(0.0f, 1.0f, 0.0f)));
+        model->AddControl(std::make_shared<EnvMapProbeControl>(Vector3(0.0f, 3.0f, 4.0f)));
+        GetScene()->AddChild(model);
+        
         auto shadow_node = std::make_shared<Node>("shadow_node");
         shadow_node->AddControl(std::make_shared<ShadowMapControl>(GetRenderer()->GetEnvironment()->GetSun().GetDirection() * -1.0f, 15.0f));
         shadow_node->AddControl(std::make_shared<CameraFollowControl>(GetCamera()));
         GetScene()->AddChild(shadow_node);
-        
-        //Environment::GetInstance()->AddPointLight(std::make_shared<PointLight>(Vector3(0, 1, 0), Vector4(1.0f, 0.0f, 0.0f, 1.0f) * 3.0f, 1.5f));
-
-        auto ui_crosshair = std::make_shared<ui::UIObject>("crosshair");
-        ui_crosshair->GetMaterial().SetTexture(MATERIAL_TEXTURE_COLOR_MAP, asset_manager->LoadFromFile<Texture2D>("textures/crosshair.png"));
-        ui_crosshair->SetLocalTranslation2D(Vector2(0));
-        ui_crosshair->SetLocalScale2D(Vector2(128));
-        GetUI()->AddChild(ui_crosshair);
-        GetUIManager()->RegisterUIObject(ui_crosshair);
-
 
         bool add_spheres = true;
 
@@ -547,7 +353,7 @@ public:
                 for (int z = 0; z < 5; z++) {
 
                     Vector3 box_position = Vector3(((float(x))), 6.4f, (float(z)));
-                    auto box = asset_manager->LoadFromFile<Node>("models/cube.obj", true);
+                    auto box = asset_manager->LoadFromFile<Node>("models/material_sphere/material_sphere.obj", true);
                     box->SetLocalScale(0.35f);
 
                     for (size_t i = 0; i < box->NumChildren(); i++) {
