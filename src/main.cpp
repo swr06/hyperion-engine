@@ -178,14 +178,14 @@ int main()
     
     auto [zombie, sponza, cube_obj] = engine.assets.Load<v2::Node>(
         base_path + "/res/models/ogrexml/dragger_Body.mesh.xml",
-        base_path + "/res/models/sponza/sponza.obj",
+        base_path + "/res/models/monkey/monkey.obj",
         base_path + "/res/models/cube.obj"
     );
 
 
     zombie->Scale(0.35f);
 
-    sponza->Scale(0.01f);
+    //sponza->Scale(0.01f);
     sponza->Update(&engine);
     
 
