@@ -406,10 +406,9 @@ Result Image::Create(Device *device, Instance *renderer,
     auto commands = renderer->GetSingleTimeCommands();
 
     { // transition from 'undefined' layout state into one optimal for transfer
-        VkImageMemoryBarrier acquire_barrier{},
-                             release_barrier{};
-
-        acquire_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        VkImageMemoryBarrier acquire_barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER},
+                             release_barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        
         acquire_barrier.oldLayout = transfer_state_pre.src.layout;
         acquire_barrier.newLayout = transfer_state_pre.dst.layout;
         acquire_barrier.image = m_image->image;
@@ -523,7 +522,8 @@ Result Image::Create(Device *device, Instance *renderer,
     HYPERION_RETURN_OK;
 }
 
-Result Image::BlitImage(Instance *renderer, Vector4 dst_rect, Image *src_image, Vector4 src_rect) {
+Result Image::BlitImage(Instance *renderer, Vector4 dst_rect, Image *src_image, Vector4 src_rect)
+{
     auto commands = renderer->GetSingleTimeCommands();
 
     VkImageSubresourceLayers input_layer{};
@@ -542,18 +542,23 @@ Result Image::BlitImage(Instance *renderer, Vector4 dst_rect, Image *src_image, 
     region.dstOffsets[0] = { (int32_t)dst_rect.x, (int32_t)dst_rect.y, 0 };
     region.dstOffsets[1] = { (int32_t)dst_rect.z, (int32_t)dst_rect.w, 1 };
 
-    commands.Push([&](VkCommandBuffer cmd) {
-        vkCmdBlitImage(cmd,
-                       src_image->GetGPUImage()->image,
-                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                       this->GetGPUImage()->image,
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                       1,
-                       &region,
-                       VK_FILTER_NEAREST);
+    commands.Push([&](CommandBuffer *cmd) {
+        vkCmdBlitImage(
+            cmd->GetCommandBuffer(),
+            src_image->GetGPUImage()->image,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            this->GetGPUImage()->image,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            1,
+            &region,
+            VK_FILTER_NEAREST
+        );
+
         HYPERION_RETURN_OK;
     });
+
     HYPERION_BUBBLE_ERRORS(commands.Execute(renderer->GetDevice()));
+
     HYPERION_RETURN_OK;
 }
 
