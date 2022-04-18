@@ -35,6 +35,7 @@ vec3 GetShadowCoord(mat4 shadow_matrix, vec3 pos) {
 
 /* Begin main shader program */
 
+#define VCT_SCALE 0.35
 #define IBL_INTENSITY 10000.0
 #define DIRECTIONAL_LIGHT_INTENSITY 200000.0
 
@@ -130,9 +131,9 @@ void main()
 
     float voxel_image_size = 64.0;
 	float half_voxel_image_size = voxel_image_size * 0.5;
-    float voxel_map_scale = 1.0;// / voxel_image_size;
+    float voxel_map_scale = 1.0 / VCT_SCALE;
     
-    vec3 pos = position.xyz * voxel_map_scale + vec3(half_voxel_image_size);
+    vec3 pos = (position.xyz - scene.camera_position.xyz) * voxel_map_scale + vec3(half_voxel_image_size);
     //output_color = vec4(Tonemap(result), 1.0);
     output_color = imageLoad(voxel_map, ivec3(pos));
     output_normals = normal;

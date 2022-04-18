@@ -44,6 +44,7 @@ private:
 
     renderer::StorageImage *m_voxel_map;
     ImageView voxel_map_view;
+    uint32_t m_voxel_render_counter = 0;
 };
 
 } // namespace hyperion::v2

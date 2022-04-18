@@ -156,14 +156,15 @@ void DeferredRenderer::Render(Engine *engine, CommandBuffer *primary, uint32_t f
     RenderOpaqueObjects(engine, primary, frame_index);
     bucket.End(engine, primary, 0);
 
-    
-    engine->RenderShadows(primary, frame_index);
+    if (m_voxel_render_counter++ % 10 == 0) {
+        engine->RenderShadows(primary, frame_index);
 
-    m_voxel_map->GetGPUImage()->InsertBarrier(
-        primary,
-        { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
-        renderer::GPUMemory::ResourceState::UNORDERED_ACCESS
-    );
+        m_voxel_map->GetGPUImage()->InsertBarrier(
+            primary,
+            { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+            renderer::GPUMemory::ResourceState::UNORDERED_ACCESS
+        );
+    }
 
     
     m_post_processing.Render(engine, primary, frame_index);
