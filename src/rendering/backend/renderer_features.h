@@ -291,7 +291,7 @@ public:
         }
 
         if (vkGetPhysicalDeviceImageFormatProperties(m_physical_device, format, type, tiling, usage, flags, out_properties) != VK_SUCCESS) {
-            return Result(Result::RENDERER_ERR, "Failed to get image format properties");
+            return Result(Result::RENDERER_ERR, "Failed to retrieve image format properties");
         }
 
         HYPERION_RETURN_OK;

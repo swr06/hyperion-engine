@@ -166,12 +166,14 @@ int main()
 #if HYPERION_VK_TEST_IMAGE_STORE
     renderer::Image *image_storage = new renderer::StorageImage(
         Extent3D{512, 512, 1},
-        Image::InternalFormat::TEXTURE_INTERNAL_FORMAT_RGBA8,
+        Image::InternalFormat::TEXTURE_INTERNAL_FORMAT_RGBA16F,
         Image::Type::TEXTURE_TYPE_2D,
         nullptr
     );
 
     ImageView image_storage_view;
+
+
 #endif
 
     auto *input_manager = new InputManager(window);
@@ -183,7 +185,7 @@ int main()
             window,
             1024,
             768,
-            70.0f,
+            80.0f,
             0.05f,
             250.0f
         )
@@ -200,14 +202,14 @@ int main()
 
     auto [zombie, sponza, cube_obj] = engine.assets.Load<v2::Node>(
         base_path + "/res/models/ogrexml/dragger_Body.mesh.xml",
-        base_path + "/res/models/material_sphere/material_sphere.obj", //San_Miguel/san-miguel-low-poly.obj",
+        base_path + "/res/models/sponza/sponza.obj",//"San_Miguel/san-miguel-low-poly.obj",
         base_path + "/res/models/cube.obj"
     );
 
-    sponza->Translate({0, 0, 5});
+    //sponza->Translate({0, 0, 5});
 
-    //sponza->Scale(0.05f);
-    sponza->Scale(5.0f);
+    sponza->Scale(0.05f);
+    //sponza->Scale(5.0f);
     //sponza->Rotate(Quaternion({1, 0, 0}, MathUtil::DegToRad(90.0f)));
     sponza->Update(&engine);
 
@@ -230,6 +232,7 @@ int main()
     ));
 
     HYPERION_ASSERT_RESULT(image_storage_view.Create(device, image_storage));
+
 #endif
 
     engine.PrepareSwapchain();
@@ -464,14 +467,14 @@ int main()
     /* Shadow cam test */
 
     Matrix4 shadow_view;
-    MatrixUtil::ToLookAt(shadow_view, {5, 5, 5}, {0, 0, 0}, {0, 1, 0});
-    Matrix4 shadow_proj;
-    MatrixUtil::ToOrtho(shadow_proj, -5, 5, -5, 5, -5, 5);
+    MatrixUtil::ToLookAt(shadow_view, {0, 0,-5.0f}, {0, 0, 1}, {0, 1, 0});
+    Matrix4 shadow_proj = Matrix4::Perspective(90.0f, 1000, 1000, 0.001f, 250.0f);
+    //MatrixUtil::ToOrtho(shadow_proj, -50, 50, -50, 50, -50, 50);
 
     engine.shader_globals->scenes.Set(1, {
         .view = shadow_view,
         .projection = shadow_proj,
-        .camera_position = {5, 5, 5, 1},
+        .camera_position = {0, 0, 4.5f, 1},
         .light_direction = Vector4(Vector3(0.5f, 0.5f, 0.0f).Normalize(), 1.0f)
     });
 
@@ -565,7 +568,6 @@ int main()
         engine.UpdateDescriptorData(frame_index);
         
         HYPERION_ASSERT_RESULT(frame->BeginCapture(engine.GetInstance()->GetDevice()));
-        engine.RenderShadows(frame->GetCommandBuffer(), frame_index);
         engine.RenderDeferred(frame->GetCommandBuffer(), frame_index);
 
 #if HYPERION_VK_TEST_IMAGE_STORE

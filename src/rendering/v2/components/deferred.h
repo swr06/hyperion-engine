@@ -41,6 +41,9 @@ private:
 
     DeferredRenderingEffect m_effect;
     PostProcessing          m_post_processing;
+
+    renderer::StorageImage *m_voxel_map;
+    ImageView voxel_map_view;
 };
 
 } // namespace hyperion::v2

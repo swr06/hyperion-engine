@@ -41,6 +41,7 @@ void DeferredRenderingEffect::Create(Engine *engine)
 {
     m_framebuffer = engine->GetRenderList()[GraphicsPipeline::BUCKET_TRANSLUCENT].framebuffers[0].Acquire();
 
+
     CreatePerFrameData(engine);
 
     engine->callbacks.Once(EngineCallback::CREATE_GRAPHICS_PIPELINES, [this, engine](...) {
@@ -67,6 +68,28 @@ DeferredRenderer::~DeferredRenderer() = default;
 void DeferredRenderer::Create(Engine *engine)
 {
     using renderer::ImageSamplerDescriptor;
+    
+    m_voxel_map = new renderer::StorageImage(
+        {64, 64, 64},
+        Image::InternalFormat::TEXTURE_INTERNAL_FORMAT_RGBA16F,
+        Image::Type::TEXTURE_TYPE_3D,
+        nullptr
+    );
+    
+    auto *descriptor_set_globals = engine->GetInstance()->GetDescriptorPool()
+        .GetDescriptorSet(DescriptorSet::DESCRIPTOR_SET_INDEX_GLOBAL);
+
+    descriptor_set_globals
+        ->AddDescriptor<renderer::ImageStorageDescriptor>(17)
+        ->AddSubDescriptor({ .image_view = &voxel_map_view });
+
+    HYPERION_ASSERT_RESULT(m_voxel_map->Create(
+        engine->GetInstance()->GetDevice(),
+        engine->GetInstance(),
+        renderer::GPUMemory::ResourceState::UNORDERED_ACCESS
+    ));
+
+    HYPERION_ASSERT_RESULT(voxel_map_view.Create(engine->GetInstance()->GetDevice(), m_voxel_map));
 
     m_post_processing.Create(engine);
 
@@ -133,7 +156,15 @@ void DeferredRenderer::Render(Engine *engine, CommandBuffer *primary, uint32_t f
     RenderOpaqueObjects(engine, primary, frame_index);
     bucket.End(engine, primary, 0);
 
-    /* TODO: render SSAO here? */
+    
+    engine->RenderShadows(primary, frame_index);
+
+    m_voxel_map->GetGPUImage()->InsertBarrier(
+        primary,
+        { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 },
+        renderer::GPUMemory::ResourceState::UNORDERED_ACCESS
+    );
+
     
     m_post_processing.Render(engine, primary, frame_index);
     

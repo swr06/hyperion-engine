@@ -113,6 +113,9 @@ public:
     inline const GraphicsPipeline *GetGraphicsPipeline(GraphicsPipeline::ID id) const
         { return const_cast<Engine*>(this)->GetGraphicsPipeline(id); }
 
+    inline ShadowRenderer &GetShadowRenderer() { return m_shadow_renderer; }
+    inline const ShadowRenderer &GetShadowRenderer() const { return m_shadow_renderer; }
+
     void SetSpatialTransform(Spatial *spatial, const Transform &transform);
 
 

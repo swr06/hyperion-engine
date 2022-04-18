@@ -13,6 +13,7 @@ layout(location=2) out vec4 output_positions;
 #include "include/gbuffer.inc"
 
 layout(set = 1, binding = 8) uniform sampler2D filter_ssao;
+layout(set = 1, binding = 17, rgba16f) uniform readonly image3D voxel_map;
 
 
 layout(set = 6, binding = 0) uniform samplerCube cubemap_textures[];
@@ -127,8 +128,13 @@ void main()
         result = albedo_linear * DIRECTIONAL_LIGHT_INTENSITY * exposure;
     }
 
+    float voxel_image_size = 64.0;
+	float half_voxel_image_size = voxel_image_size * 0.5;
+    float voxel_map_scale = 1.0;// / voxel_image_size;
     
-    output_color = vec4(Tonemap(result), 1.0);
+    vec3 pos = position.xyz * voxel_map_scale + vec3(half_voxel_image_size);
+    //output_color = vec4(Tonemap(result), 1.0);
+    output_color = imageLoad(voxel_map, ivec3(pos));
     output_normals = normal;
     output_positions = position;
 }
