@@ -26,13 +26,12 @@
 #include "rendering/backend/renderer_instance.h"
 #include "rendering/backend/renderer_descriptor_set.h"
 #include "rendering/backend/renderer_image.h"
-#include "rendering/backend/renderer_fbo.h"
 #include "rendering/backend/renderer_render_pass.h"
+#include "rendering/backend/rt/renderer_raytracing_pipeline.h"
 
 #include <rendering/v2/engine.h>
 #include <rendering/v2/components/node.h>
 #include <rendering/v2/components/atomics.h>
-#include <rendering/v2/components/svo.h>
 #include <rendering/v2/components/bone.h>
 #include <rendering/v2/asset/model_loaders/obj_model_loader.h>
 
@@ -203,13 +202,13 @@ int main()
 
     auto [zombie, sponza, cube_obj] = engine.assets.Load<v2::Node>(
         base_path + "/res/models/ogrexml/dragger_Body.mesh.xml",
-        base_path + "/res/models/sponza/sponza.obj", //San_Miguel/san-miguel-low-poly.obj", //,//"
+        base_path + "/res/models/material_sphere/material_sphere.obj", //San_Miguel/san-miguel-low-poly.obj", //,//"
         base_path + "/res/models/cube.obj"
     );
 
     sponza->Translate({0, 0, 5});
 
-    sponza->Scale(0.02f);
+    //sponza->Scale(0.02f);
     //sponza->Scale(0.45f);
     //sponza->Rotate(Quaternion({1, 0, 0}, MathUtil::DegToRad(90.0f)));
     sponza->Update(&engine);
@@ -232,9 +231,6 @@ int main()
 
     HYPERION_ASSERT_RESULT(image_storage_view.Create(device, image_storage));
 #endif
-
-    v2::SparseVoxelOctree svo;
-    svo.Init(&engine);
 
     engine.PrepareSwapchain();
     
@@ -335,8 +331,6 @@ int main()
 
         std::function<void(v2::Node *)> find_spatials = [&](v2::Node *node) {
             if (auto *spatial = node->GetSpatial()) {
-                // engine.GetGraphicsPipeline(svo.GetVoxelizer()->GetGraphicsPipelineId())->AddSpatial(engine.resources.spatials.Acquire(spatial));
-
                 pipeline->AddSpatial(engine.resources.spatials.Acquire(spatial));
             }
 
@@ -454,7 +448,13 @@ int main()
     
     engine.Compile();
 
-    svo.Build(&engine);
+    auto rt_shader = std::make_unique<ShaderProgram>();
+    rt_shader->AttachShader(engine.GetDevice(), ShaderModule::Type::RAY_GEN, {
+        FileByteReader(AssetManager::GetInstance()->GetRootDir() + "/vkshaders/rt/test.rgen.spv").Read()
+    });
+
+    auto rt = std::make_unique<RaytracingPipeline>(std::move(rt_shader));
+    HYPERION_ASSERT_RESULT(rt->Create(engine.GetDevice(), &engine.GetInstance()->GetDescriptorPool()));
 
 #if HYPERION_VK_TEST_IMAGE_STORE
     VkFence compute_fc;

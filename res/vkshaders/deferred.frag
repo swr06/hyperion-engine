@@ -33,8 +33,8 @@ vec3 GetShadowCoord(mat4 shadow_matrix, vec3 pos)
 
 /* Begin main shader program */
 
-#define IBL_INTENSITY 6000.0
-#define DIRECTIONAL_LIGHT_INTENSITY 150000.0
+#define IBL_INTENSITY 20000.0
+#define DIRECTIONAL_LIGHT_INTENSITY 200000.0
 #define GI_INTENSITY 20.0
 #define VCT_ENABLED 0
 
@@ -79,7 +79,7 @@ void main()
     
     if (perform_lighting) {
         float metallic = 0.05;
-        float roughness = 0.5;
+        float roughness = 0.8;
         
         float NdotL = max(0.0001, dot(N, L));
         float NdotV = max(0.0001, dot(N, V));
@@ -148,7 +148,7 @@ void main()
         result += surface;
 
     } else {
-        result = albedo_linear * IBL_INTENSITY * exposure;
+        result = albedo.rgb * IBL_INTENSITY * exposure;
     }
 
     output_color = vec4(Tonemap(result), 1.0);
